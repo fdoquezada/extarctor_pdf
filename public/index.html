@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extractor de Datos PDF</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            color: #1a1a1a;
+            line-height: 1.6;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h2 {
+            color: #2c3e50;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+
+        .upload-section {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .file-input-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        #fileInput {
+            flex: 1;
+            padding: 0.5rem;
+            border: 2px dashed #3498db;
+            border-radius: 5px;
+            background-color: #f8fafc;
+            cursor: pointer;
+        }
+
+        .button-container {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .btn {
+            padding: 0.8rem 1.5rem;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        #uploadButton {
+            background-color: #3498db;
+            color: white;
+        }
+
+        #uploadButton:hover {
+            background-color: #2980b9;
+        }
+
+        #clearButton {
+            background-color: #e74c3c;
+            color: white;
+        }
+
+        #clearButton:hover {
+            background-color: #c0392b;
+        }
+
+        #tableContainer {
+            margin-top: 2rem;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+            background-color: white;
+        }
+
+        th, td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid #e1e1e1;
+        }
+
+        th {
+            background-color: #f8fafc;
+            font-weight: bold;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 1rem 0;
+        }
+
+        .error-message {
+            color: #e74c3c;
+            margin-top: 1rem;
+            text-align: center;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding: 1rem;
+            }
+
+            .file-input-container {
+                flex-direction: column;
+            }
+
+            .button-container {
+                flex-direction: column;
+            }
+
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Extractor de Datos PDF</h2>
+        
+        <div class="upload-section">
+            <div class="file-input-container">
+                <input type="file" id="fileInput" accept="application/pdf" />
+                <div class="button-container">
+                    <button id="uploadButton" class="btn" onclick="uploadPDF()">Extraer Datos</button>
+                    <button id="clearButton" class="btn" onclick="clearAll()">Limpiar</button>
+                </div>
+            </div>
+            <div class="loading" id="loading">Procesando archivo...</div>
+            <div class="error-message" id="errorMessage"></div>
+        </div>
+
+        <div id="tableContainer"></div>
+    </div>
+
+    <script>
+        async function uploadPDF() {
+            const fileInput = document.getElementById('fileInput');
+            const loading = document.getElementById('loading');
+            const errorMessage = document.getElementById('errorMessage');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                errorMessage.textContent = 'Por favor, selecciona un archivo PDF.';
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('pdfFile', file);
+
+            try {
+                loading.style.display = 'block';
+                errorMessage.textContent = '';
+
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    throw new Error('Error al procesar el archivo PDF.');
+                }
+
+                const data = await response.json();
+                displayResults(data);
+            } catch (error) {
+                console.error('Error:', error);
+                errorMessage.textContent = 'Ocurrió un error al procesar el archivo PDF.';
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        function displayResults(data) {
+            const tableContainer = document.getElementById('tableContainer');
+            
+            const table = document.createElement('table');
+            table.innerHTML = `
+                <tr>
+                    <th>Propiedad</th>
+                    <th>Valor</th>
+                </tr>
+                <tr>
+                    <td>Número de Páginas</td>
+                    <td>${data.numPages}</td>
+                </tr>
+                <tr>
+                    <td>Método de Procesamiento</td>
+                    <td>${data.info.processedWithOCR ? 'OCR (PDF Escaneado)' : 'Texto Digital'}</td>
+                </tr>
+                <tr>
+                    <td>Texto Extraído</td>
+                    <td>
+                        <div style="max-height: 300px; overflow-y: auto; white-space: pre-wrap;">
+                            ${data.text}
+                        </div>
+                    </td>
+                </tr>
+            `;
+
+            tableContainer.innerHTML = '';
+            tableContainer.appendChild(table);
+        }
+
+        function clearAll() {
+            // Limpiar el input de archivo
+            document.getElementById('fileInput').value = '';
+            
+            // Limpiar la tabla de resultados
+            document.getElementById('tableContainer').innerHTML = '';
+            
+            // Limpiar mensajes de error
+            document.getElementById('errorMessage').textContent = '';
+            
+            // Ocultar el indicador de carga si está visible
+            document.getElementById('loading').style.display = 'none';
+        }
+    </script>
+</body>
+</html> 
